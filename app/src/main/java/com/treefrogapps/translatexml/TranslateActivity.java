@@ -41,6 +41,7 @@ public class TranslateActivity extends AppCompatActivity {
     private Button translateButton;
 
     private ArrayList<Translation> translationArrayList = new ArrayList<>();
+    private String xmlString;
 
 
     @Override
@@ -123,8 +124,9 @@ public class TranslateActivity extends AppCompatActivity {
 
     public void okHttpConnect(String wordsToTranslate) {
 
-        wordsToTranslate = wordsToTranslate.replace(" ", "+");
+        wordsToTranslate = wordsToTranslate.replace(" ", "+").replace("'","");
         String url = "http://www.treefrogapps.com/language/translateitxml.php?action=translations&english_words=" + wordsToTranslate;
+
 
         OkHttpClient okHttpClient = new OkHttpClient();
         okHttpClient.setConnectTimeout(9000, TimeUnit.MILLISECONDS);
@@ -155,79 +157,114 @@ public class TranslateActivity extends AppCompatActivity {
                         stringBuilder.append(line);
                     }
 
-                    String xmlString = stringBuilder.toString();
+                    xmlString = stringBuilder.toString();
                     Log.v("XML STRING : ", xmlString);
+                    outputTranslations(xmlString);
 
 
-                    try {
-
-                        outputTranslations(xmlString);
-
-                    } catch (XmlPullParserException e) {
-                        e.printStackTrace();
-                    }
 
                 } else {
                     Toast.makeText(getApplicationContext(), "Error : " + String.valueOf(response.code()), Toast.LENGTH_SHORT).show();
                 }
             }
         });
-
     }
 
-    public void outputTranslations(String xmlString) throws XmlPullParserException, IOException {
+    public void outputTranslations(String xmlString) {
 
-        // create a new instance of XmlPullParserFactory
-        XmlPullParserFactory pullParserFactory = XmlPullParserFactory.newInstance();
-        pullParserFactory.setNamespaceAware(true);
+/*
+        XML FORMAT :
+        ------------
 
-        // create a new XmlPullParser to pull the data from the string
-        XmlPullParser xmlPullParser = pullParserFactory.newPullParser();
-        xmlPullParser.setInput(new StringReader(xmlString));
+        <translations>
+            <language_translation>
+                <language>arabic</language>
+                <translation>هذا</translation>
+            </language_translation>
+            <language_translation>
+                <language>chinese</language>
+                <translation>此</translation>
+            </language_translation>
+        </translations>
+*/
 
-        // Xml has EventType for START and END of document
-        // Also <TAG></TAG> are event types - the DATA is the text between the tags
-        int eventType = xmlPullParser.getEventType();
+        translationArrayList.clear();
+        Translation translation = null;
+        String itemText = null;
 
-        while (eventType != XmlPullParser.END_DOCUMENT){
+        try {
+            // create a new instance of XmlPullParserFactory
+            XmlPullParserFactory pullParserFactory = XmlPullParserFactory.newInstance();
+            pullParserFactory.setNamespaceAware(true);
 
-            String language = null;
-            String itemTranslation = null;
-            Translation translation = new Translation();
+            // create a new XmlPullParser to pull the data from the string
+            XmlPullParser xmlPullParser = pullParserFactory.newPullParser();
+            xmlPullParser.setInput(new StringReader(xmlString));
 
-            // if statement to see what the next tags are (we want a start tag)
-            // but want to skip empty tags to the ones that contain data/text
+            // Xml has EventType for START and END of document
+            // Also <TAG></TAG> are event types - the DATA is the text between the tags
+            int eventType = xmlPullParser.getEventType();
 
-            switch (eventType){
+            while (eventType != XmlPullParser.END_DOCUMENT) {
 
-                case XmlPullParser.END_TAG :
+                // switch statement to see what the next tags are (we want a start tag)
+                // get any text amd use ENG_TAG case statement and if/else if to decide what it is
+
+                switch (eventType) {
+
+                    case XmlPullParser.START_TAG:
 
 
-                    if(xmlPullParser.getName().equals("language")){
+                        if (xmlPullParser.getName().equals("language_translation")) {
+                            translation = new Translation();
+                        }
+                        break;
 
-                        language = xmlPullParser.getText();
-                        translation.setLanguage(language);
 
-                    }  else if (xmlPullParser.getName().equals("translation")){
+                    case XmlPullParser.TEXT:
 
-                        itemTranslation = xmlPullParser.nextText();
-                        translation.setTranslation(itemTranslation);
-                        translationArrayList.add(translation);
-                    }
+                        itemText = xmlPullParser.getText();
+                        Log.v("ITEM TEXT : ", itemText);
+                        break;
 
-                    xmlPullParser.next();
-                    break;
+
+                    case XmlPullParser.END_TAG:
+
+                        if (xmlPullParser.getName().equals("language_translation")) {
+                            translationArrayList.add(translation);
+
+                        } else if (xmlPullParser.getName().equals("language")){
+                            translation.setLanguage(itemText);
+
+                        } else if (xmlPullParser.getName().equals("translation")){
+                            translation.setTranslation(itemText);
+
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+
+                eventType = xmlPullParser.next();
             }
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    translateAdapter = new TranslateAdapter(translationArrayList, getApplicationContext());
+                    translateListView.setAdapter(translateAdapter);
+                }
+            });
+
+
+
+
+        } catch (XmlPullParserException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-
-                translateAdapter = new TranslateAdapter(translationArrayList, getApplicationContext());
-                translateListView.setAdapter(translateAdapter);
-            }
-        });
 
     } // END OF outputTranslations
 
