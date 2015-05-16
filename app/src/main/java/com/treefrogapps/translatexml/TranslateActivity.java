@@ -39,6 +39,7 @@ public class TranslateActivity extends AppCompatActivity {
     private EditText englishWordsEditText;
     private ListView translateListView;
     private Button translateButton;
+
     private ArrayList<Translation> translationArrayList = new ArrayList<>();
 
 
